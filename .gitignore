@@ -1,4 +1,5 @@
 .env
 certs/
 *.log
-docs/engineering-guide.md
+docs/
+t_shaped_enterprise_guide/
