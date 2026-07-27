@@ -1,3 +1,4 @@
 .env
 certs/
 *.log
+docs/engineering-guide.md
