@@ -1,0 +1,41 @@
+services:
+  trino-worker:
+    image: trinodb/trino:${TRINO_VERSION:-470}
+    container_name: ${TRINO_NODE_ID:-trino-worker}
+    hostname: ${TRINO_NODE_ID:-trino-worker}
+    restart: unless-stopped
+    ports:
+      - "${TRINO_INTERNAL_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ../../etc/worker-template/config.properties:/etc/trino/config.properties:ro
+      - ../../etc/worker-template/node.properties:/etc/trino/node.properties:ro
+      - ../../etc/worker-template/jvm.config:/etc/trino/jvm.config:ro
+      - ../../etc/worker-template/log.properties:/etc/trino/log.properties:ro
+      - ../../etc/catalog:/etc/trino/catalog:ro
+      - trino-worker-data:/data/trino
+    environment:
+      TRINO_ENVIRONMENT: ${TRINO_ENVIRONMENT:-prod}
+      TRINO_NODE_ID: ${TRINO_NODE_ID:?Set TRINO_NODE_ID to trino-worker-01, trino-worker-02, or trino-worker-03}
+      TRINO_COORDINATOR_URI: ${TRINO_COORDINATOR_URI:?Set TRINO_COORDINATOR_URI to http://coordinator-host:8080}
+      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-postgres.example.internal}
+      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-5432}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-analytics}
+      POSTGRESQL_USER: ${POSTGRESQL_USER:-trino}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-change-me}
+      ORACLE_HOST: ${ORACLE_HOST:-oracle.example.internal}
+      ORACLE_PORT: ${ORACLE_PORT:-1521}
+      ORACLE_SERVICE: ${ORACLE_SERVICE:-ORCLPDB1}
+      ORACLE_USER: ${ORACLE_USER:-trino}
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-change-me}
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+      nproc:
+        soft: 128000
+        hard: 128000
+    cpus: "16.0"
+    mem_limit: 64g
+
+volumes:
+  trino-worker-data:

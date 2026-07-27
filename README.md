@@ -1,8 +1,19 @@
 # Trino Docker Setup
 
-This repository runs a small Trino cluster with one coordinator and one worker.
+This repository runs a Trino cluster with one coordinator and three workers.
 It is intended as a production-ready starting point for Oracle Linux / RHEL-like
 servers, not as a final security baseline.
+
+## Target Topology
+
+| Role | Count | vCPU | RAM | SSD | JVM heap |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Coordinator | 1 | 8 | 32 GB | 100 GB | 24 GB |
+| Worker | 3 | 16 each | 64 GB each | 200 GB each | 52 GB each |
+
+The compose file applies CPU and memory limits for the containers. Disk size is
+a host provisioning concern; make sure the Docker data root or mounted volume
+for the coordinator has at least 100 GB and each worker has at least 200 GB.
 
 ## Server Baseline
 
@@ -25,14 +36,18 @@ deployment requirements before bumping `TRINO_VERSION`.
 
 ## Files
 
-- `docker-compose.yml`: coordinator, worker, network, ulimits, healthcheck
+- `docker-compose.yml`: coordinator, 3 workers, network, ulimits, healthcheck
+- `deploy/coordinator/docker-compose.yml`: coordinator-only compose for the
+  coordinator server
+- `deploy/worker/docker-compose.yml`: worker-only compose for each worker server
 - `etc/coordinator`: coordinator Trino config
-- `etc/worker`: worker Trino config
+- `etc/worker-1`, `etc/worker-2`, `etc/worker-3`: worker Trino configs
+- `etc/worker-template`: worker config for separate worker servers
 - `etc/catalog`: database connector catalogs
 - `.env.example`: environment template for secrets and endpoints
 - `scripts/preflight.sh`: host readiness checks
 
-## Usage
+## Local Topology Test
 
 Create an environment file:
 
@@ -67,6 +82,29 @@ Open the Trino UI:
 http://localhost:8080
 ```
 
+## Separate Servers
+
+For the requested production shape, run the coordinator compose file only on the
+8 vCPU / 32 GB / 100 GB coordinator server:
+
+```bash
+docker compose -f deploy/coordinator/docker-compose.yml up -d
+```
+
+Run the worker compose file on each 16 vCPU / 64 GB / 200 GB worker server. Use
+a unique `TRINO_NODE_ID` per server and point `TRINO_COORDINATOR_URI` at the
+coordinator DNS name or IP address:
+
+```bash
+TRINO_NODE_ID=trino-worker-01 TRINO_COORDINATOR_URI=http://coordinator-host:8080 docker compose -f deploy/worker/docker-compose.yml up -d
+TRINO_NODE_ID=trino-worker-02 TRINO_COORDINATOR_URI=http://coordinator-host:8080 docker compose -f deploy/worker/docker-compose.yml up -d
+TRINO_NODE_ID=trino-worker-03 TRINO_COORDINATOR_URI=http://coordinator-host:8080 docker compose -f deploy/worker/docker-compose.yml up -d
+```
+
+Open TCP `8080` from each worker to the coordinator. If HTTPS-only internal
+traffic is enabled later, change `TRINO_COORDINATOR_URI` to the `https://...:8443`
+endpoint and open TCP `8443`.
+
 ## TLS
 
 HTTPS is intentionally left commented until the keystore and authentication
@@ -77,12 +115,13 @@ policy are known. To enable it:
 3. Uncomment the `8443` port mapping in `docker-compose.yml`.
 4. Store `TRINO_KEYSTORE_PASSWORD` in `.env` or your secret manager.
 
-## Scaling Workers
+## Worker Layout
 
-This compose file defines one worker with a static `node.id`. For more workers,
-create separate worker config directories with unique `node.id` values, then add
-or template additional services. Do not run multiple replicas with the same
-`node.id`.
+Each worker has a separate config directory and a unique `node.id`. Do not run
+multiple workers with the same `node.id`.
+
+The root compose file is useful for local topology testing on one Docker host.
+The `deploy/*` compose files fit the requested separate-server layout.
 
 ## Production Notes
 

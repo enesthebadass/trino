@@ -1,3 +1,38 @@
+x-trino-environment: &trino-environment
+  TRINO_ENVIRONMENT: ${TRINO_ENVIRONMENT:-prod}
+  TRINO_COORDINATOR_URI: ${TRINO_COORDINATOR_URI:-http://trino-coordinator:8080}
+  POSTGRESQL_HOST: ${POSTGRESQL_HOST:-postgres.example.internal}
+  POSTGRESQL_PORT: ${POSTGRESQL_PORT:-5432}
+  POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-analytics}
+  POSTGRESQL_USER: ${POSTGRESQL_USER:-trino}
+  POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-change-me}
+  ORACLE_HOST: ${ORACLE_HOST:-oracle.example.internal}
+  ORACLE_PORT: ${ORACLE_PORT:-1521}
+  ORACLE_SERVICE: ${ORACLE_SERVICE:-ORCLPDB1}
+  ORACLE_USER: ${ORACLE_USER:-trino}
+  ORACLE_PASSWORD: ${ORACLE_PASSWORD:-change-me}
+
+x-trino-ulimits: &trino-ulimits
+  nofile:
+    soft: 131072
+    hard: 131072
+  nproc:
+    soft: 128000
+    hard: 128000
+
+x-trino-worker-common: &trino-worker-common
+  image: trinodb/trino:${TRINO_VERSION:-470}
+  restart: unless-stopped
+  depends_on:
+    trino-coordinator:
+      condition: service_healthy
+  environment: *trino-environment
+  ulimits: *trino-ulimits
+  cpus: "16.0"
+  mem_limit: 64g
+  networks:
+    - trino-net
+
 services:
   trino-coordinator:
     image: trinodb/trino:${TRINO_VERSION:-470}
@@ -17,25 +52,10 @@ services:
       - trino-coordinator-data:/data/trino
       # Mount TLS material here when HTTPS is enabled.
       # - ./certs:/etc/trino/certs:ro
-    environment:
-      TRINO_ENVIRONMENT: ${TRINO_ENVIRONMENT:-prod}
-      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-postgres.example.internal}
-      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-5432}
-      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-analytics}
-      POSTGRESQL_USER: ${POSTGRESQL_USER:-trino}
-      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-change-me}
-      ORACLE_HOST: ${ORACLE_HOST:-oracle.example.internal}
-      ORACLE_PORT: ${ORACLE_PORT:-1521}
-      ORACLE_SERVICE: ${ORACLE_SERVICE:-ORCLPDB1}
-      ORACLE_USER: ${ORACLE_USER:-trino}
-      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-change-me}
-    ulimits:
-      nofile:
-        soft: 131072
-        hard: 131072
-      nproc:
-        soft: 128000
-        hard: 128000
+    environment: *trino-environment
+    ulimits: *trino-ulimits
+    cpus: "8.0"
+    mem_limit: 32g
     healthcheck:
       test: ["CMD", "/usr/lib/trino/bin/health-check"]
       interval: 15s
@@ -44,42 +64,41 @@ services:
     networks:
       - trino-net
 
-  trino-worker:
-    image: trinodb/trino:${TRINO_VERSION:-470}
-    container_name: trino-worker
-    hostname: trino-worker
-    restart: unless-stopped
-    depends_on:
-      trino-coordinator:
-        condition: service_healthy
+  trino-worker-1:
+    <<: *trino-worker-common
+    container_name: trino-worker-1
+    hostname: trino-worker-1
     volumes:
-      - ./etc/worker/config.properties:/etc/trino/config.properties:ro
-      - ./etc/worker/node.properties:/etc/trino/node.properties:ro
-      - ./etc/worker/jvm.config:/etc/trino/jvm.config:ro
-      - ./etc/worker/log.properties:/etc/trino/log.properties:ro
+      - ./etc/worker-1/config.properties:/etc/trino/config.properties:ro
+      - ./etc/worker-1/node.properties:/etc/trino/node.properties:ro
+      - ./etc/worker-1/jvm.config:/etc/trino/jvm.config:ro
+      - ./etc/worker-1/log.properties:/etc/trino/log.properties:ro
       - ./etc/catalog:/etc/trino/catalog:ro
-      - trino-worker-data:/data/trino
-    environment:
-      TRINO_ENVIRONMENT: ${TRINO_ENVIRONMENT:-prod}
-      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-postgres.example.internal}
-      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-5432}
-      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-analytics}
-      POSTGRESQL_USER: ${POSTGRESQL_USER:-trino}
-      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-change-me}
-      ORACLE_HOST: ${ORACLE_HOST:-oracle.example.internal}
-      ORACLE_PORT: ${ORACLE_PORT:-1521}
-      ORACLE_SERVICE: ${ORACLE_SERVICE:-ORCLPDB1}
-      ORACLE_USER: ${ORACLE_USER:-trino}
-      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-change-me}
-    ulimits:
-      nofile:
-        soft: 131072
-        hard: 131072
-      nproc:
-        soft: 128000
-        hard: 128000
-    networks:
-      - trino-net
+      - trino-worker-1-data:/data/trino
+
+  trino-worker-2:
+    <<: *trino-worker-common
+    container_name: trino-worker-2
+    hostname: trino-worker-2
+    volumes:
+      - ./etc/worker-2/config.properties:/etc/trino/config.properties:ro
+      - ./etc/worker-2/node.properties:/etc/trino/node.properties:ro
+      - ./etc/worker-2/jvm.config:/etc/trino/jvm.config:ro
+      - ./etc/worker-2/log.properties:/etc/trino/log.properties:ro
+      - ./etc/catalog:/etc/trino/catalog:ro
+      - trino-worker-2-data:/data/trino
+
+  trino-worker-3:
+    <<: *trino-worker-common
+    container_name: trino-worker-3
+    hostname: trino-worker-3
+    volumes:
+      - ./etc/worker-3/config.properties:/etc/trino/config.properties:ro
+      - ./etc/worker-3/node.properties:/etc/trino/node.properties:ro
+      - ./etc/worker-3/jvm.config:/etc/trino/jvm.config:ro
+      - ./etc/worker-3/log.properties:/etc/trino/log.properties:ro
+      - ./etc/catalog:/etc/trino/catalog:ro
+      - trino-worker-3-data:/data/trino
 
 networks:
   trino-net:
@@ -87,4 +106,6 @@ networks:
 
 volumes:
   trino-coordinator-data:
-  trino-worker-data:
+  trino-worker-1-data:
+  trino-worker-2-data:
+  trino-worker-3-data:

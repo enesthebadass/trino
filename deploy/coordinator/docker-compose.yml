@@ -1,0 +1,47 @@
+services:
+  trino-coordinator:
+    image: trinodb/trino:${TRINO_VERSION:-470}
+    container_name: trino-coordinator
+    hostname: ${TRINO_COORDINATOR_HOSTNAME:-trino-coordinator}
+    restart: unless-stopped
+    ports:
+      - "${TRINO_HTTP_PORT:-8080}:8080"
+      # - "${TRINO_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ../../etc/coordinator/config.properties:/etc/trino/config.properties:ro
+      - ../../etc/coordinator/node.properties:/etc/trino/node.properties:ro
+      - ../../etc/coordinator/jvm.config:/etc/trino/jvm.config:ro
+      - ../../etc/coordinator/log.properties:/etc/trino/log.properties:ro
+      - ../../etc/catalog:/etc/trino/catalog:ro
+      - trino-coordinator-data:/data/trino
+      # - ../../certs:/etc/trino/certs:ro
+    environment:
+      TRINO_ENVIRONMENT: ${TRINO_ENVIRONMENT:-prod}
+      TRINO_COORDINATOR_URI: ${TRINO_COORDINATOR_URI:-http://trino-coordinator:8080}
+      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-postgres.example.internal}
+      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-5432}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-analytics}
+      POSTGRESQL_USER: ${POSTGRESQL_USER:-trino}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-change-me}
+      ORACLE_HOST: ${ORACLE_HOST:-oracle.example.internal}
+      ORACLE_PORT: ${ORACLE_PORT:-1521}
+      ORACLE_SERVICE: ${ORACLE_SERVICE:-ORCLPDB1}
+      ORACLE_USER: ${ORACLE_USER:-trino}
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-change-me}
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+      nproc:
+        soft: 128000
+        hard: 128000
+    cpus: "8.0"
+    mem_limit: 32g
+    healthcheck:
+      test: ["CMD", "/usr/lib/trino/bin/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  trino-coordinator-data:
