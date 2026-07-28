@@ -1,0 +1,26 @@
+[Unit]
+Description=Trino Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Trino root ile calistirilmamali. 01_install_trino.sh bu kullaniciyi olusturur.
+User=trino
+Group=trino
+
+# --etc-dir ile configlerin /etc/trino altindan okunmasini sagliyoruz.
+ExecStart=/opt/trino/bin/launcher run --etc-dir=/etc/trino
+ExecStop=/opt/trino/bin/launcher stop --etc-dir=/etc/trino
+
+Restart=on-failure
+RestartSec=10
+
+# Trino icin kritik OS limitleri.
+LimitNOFILE=131072
+LimitNPROC=128000
+
+# JVM crash/heap dump gibi dosyalar icin calisma dizini.
+WorkingDirectory=/var/lib/trino
+
+[Install]
+WantedBy=multi-user.target
